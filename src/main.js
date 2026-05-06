@@ -565,14 +565,27 @@ class HomeFeedCard extends LitElement {
         	this.calendars.map(
           		async calendar => {
           			try {
-          				// Use WebSocket API for calendar events
-          				let result = await this._hass.callWS({
+          				// Use WebSocket API for calendar events with subscription
+          				let events = [];
+          				let unsubscribe = await this._hass.callWS({
           					type: 'calendar/event/subscribe',
           					entity_id: calendar,
           					start: start,
           					end: end
+          				}, (response) => {
+          					// The response contains the events directly
+          					if (response && response.events) {
+          						events = response.events.map(x => { return {...x, calendar: calendar} });
+          					}
           				});
-          				return result.events ? result.events.map(x => { return {...x, calendar: calendar} }) : [];
+          				
+          				// Unsubscribe immediately after we get the initial data
+          				// The subscription callback is called immediately with current events
+          				if (typeof unsubscribe === 'function') {
+          					unsubscribe();
+          				}
+          				
+          				return events;
           			} catch (wsError) {
           				console.error(`Error subscribing to calendar ${calendar}:`, wsError?.message || wsError);
           				return [];
