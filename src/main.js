@@ -564,58 +564,28 @@ class HomeFeedCard extends LitElement {
 			var calendars = await Promise.all(
         	this.calendars.map(
           		(calendar) => {
-          			return new Promise((resolve) => {
+          			return new Promise(async (resolve) => {
           				try {
           					// Use WebSocket API for calendar events with subscription
+          					// The callWS will return immediately with the current events
+          					const response = await this._hass.callWS({
+          						type: 'calendar/event/subscribe',
+          						entity_id: calendar,
+          						start: start,
+          						end: end
+          					});
+          					
           					// Response format: { event: { events: [...] } }
-          					let hasResolved = false;
-          					let unsubscribe = null;
-          					
-          					// Timeout after 5 seconds if no response
-          					const timeoutId = setTimeout(() => {
-          						if (!hasResolved) {
-          							hasResolved = true;
-          							if (unsubscribe && typeof unsubscribe === 'function') {
-          								unsubscribe();
-          							}
-          							console.warn(`Timeout waiting for calendar events from ${calendar}`);
-          							resolve([]);
-          						}
-          					}, 5000);
-          					
-          					unsubscribe = this._hass.connection.subscribeMessage(
-          						(response) => {
-          							if (response && response.event && response.event.events) {
-          								const events = response.event.events.map(x => { return {...x, calendar: calendar} });
-          								if (!hasResolved) {
-          									hasResolved = true;
-          									clearTimeout(timeoutId);
-          									// Unsubscribe immediately after we get the first response
-          									if (typeof unsubscribe === 'function') {
-          										unsubscribe();
-          									}
-          									resolve(events);
-          								}
-          							} else if (response && response.event && response.event.events === null) {
-          								// Error occurred while fetching events
-          								console.warn(`Error fetching events for calendar ${calendar}`);
-          								if (!hasResolved) {
-          									hasResolved = true;
-          									clearTimeout(timeoutId);
-          									if (typeof unsubscribe === 'function') {
-          										unsubscribe();
-          									}
-          									resolve([]);
-          								}
-          							}
-          						},
-          						{
-          							type: 'calendar/event/subscribe',
-          							entity_id: calendar,
-          							start: start,
-          							end: end
-          						}
-          					);
+          					if (response && response.event && response.event.events) {
+          						const events = response.event.events.map(x => { return {...x, calendar: calendar} });
+          						resolve(events);
+          					} else if (response && response.event && response.event.events === null) {
+          						console.warn(`Error fetching events for calendar ${calendar}`);
+          						resolve([]);
+          					} else {
+          						console.warn(`Unexpected response format for calendar ${calendar}:`, response);
+          						resolve([]);
+          					}
           				} catch (wsError) {
           					console.error(`Error subscribing to calendar ${calendar}:`, wsError?.message || wsError);
           					resolve([]);
