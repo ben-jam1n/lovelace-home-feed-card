@@ -541,19 +541,20 @@ class HomeFeedCard extends LitElement {
 	if(!lastUpdate || (this.moment && this.moment().diff(lastUpdate, 'minutes') > 15)) {
 		let calendarDaysBack = (typeof this._config.calendar_days_back !== 'undefined' ? this._config.calendar_days_back : 0);
 		let calendarDaysForward = (typeof this._config.calendar_days_forward !== 'undefined' ? this._config.calendar_days_forward : 1);
-		const start = this.moment().startOf('day').add(-calendarDaysBack, 'days').utc().format("YYYY-MM-DDTHH:mm:ss");
-		const end = this.moment().startOf('day').add(calendarDaysForward + 1, 'days').utc().format("YYYY-MM-DDTHH:mm:ss");
+		// Use ISO 8601 format with timezone for Home Assistant API
+		const start = this.moment().startOf('day').add(-calendarDaysBack, 'days').toISOString();
+		const end = this.moment().startOf('day').add(calendarDaysForward + 1, 'days').toISOString();
 		try{
 			var calendars = await Promise.all(
         	this.calendars.map(
           		async calendar => {
-          			let url = `calendars/${calendar}?start=${start}Z&end=${end}Z`;
+          			let url = `calendars/${calendar}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
           			let result = await this._hass.callApi('get', url);
           			return result.map(x => { return {...x, calendar: calendar} });
           		  }));
         }
         catch(e){
-        	console.error("Error getting calendar events");
+        	console.error("Error getting calendar events", e);
         	var calendars = [];
         }
         
