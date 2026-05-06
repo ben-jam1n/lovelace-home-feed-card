@@ -569,15 +569,31 @@ class HomeFeedCard extends LitElement {
           					// Use WebSocket API for calendar events with subscription
           					// Response format: { event: { events: [...] } }
           					let hasResolved = false;
+          					let unsubscribe = null;
           					
-          					const unsubscribe = this._hass.connection.subscribeMessage(
+          					// Timeout after 5 seconds if no response
+          					const timeoutId = setTimeout(() => {
+          						if (!hasResolved) {
+          							hasResolved = true;
+          							if (unsubscribe && typeof unsubscribe === 'function') {
+          								unsubscribe();
+          							}
+          							console.warn(`Timeout waiting for calendar events from ${calendar}`);
+          							resolve([]);
+          						}
+          					}, 5000);
+          					
+          					unsubscribe = this._hass.connection.subscribeMessage(
           						(response) => {
           							if (response && response.event && response.event.events) {
           								const events = response.event.events.map(x => { return {...x, calendar: calendar} });
           								if (!hasResolved) {
           									hasResolved = true;
+          									clearTimeout(timeoutId);
           									// Unsubscribe immediately after we get the first response
-          									unsubscribe();
+          									if (typeof unsubscribe === 'function') {
+          										unsubscribe();
+          									}
           									resolve(events);
           								}
           							} else if (response && response.event && response.event.events === null) {
@@ -585,7 +601,10 @@ class HomeFeedCard extends LitElement {
           								console.warn(`Error fetching events for calendar ${calendar}`);
           								if (!hasResolved) {
           									hasResolved = true;
-          									unsubscribe();
+          									clearTimeout(timeoutId);
+          									if (typeof unsubscribe === 'function') {
+          										unsubscribe();
+          									}
           									resolve([]);
           								}
           							}
@@ -597,16 +616,6 @@ class HomeFeedCard extends LitElement {
           							end: end
           						}
           					);
-          					
-          					// Timeout after 5 seconds if no response
-          					setTimeout(() => {
-          						if (!hasResolved) {
-          							hasResolved = true;
-          							unsubscribe();
-          							console.warn(`Timeout waiting for calendar events from ${calendar}`);
-          							resolve([]);
-          						}
-          					}, 5000);
           				} catch (wsError) {
           					console.error(`Error subscribing to calendar ${calendar}:`, wsError?.message || wsError);
           					resolve([]);
