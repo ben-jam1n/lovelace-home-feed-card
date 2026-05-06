@@ -575,6 +575,9 @@ class HomeFeedCard extends LitElement {
           						end: end
           					});
           					
+          					// Log the full response to understand the format
+          					console.log(`Calendar response for ${calendar}:`, response);
+          					
           					// Response format: { event: { events: [...] } }
           					if (response && response.event && response.event.events) {
           						const events = response.event.events.map(x => { return {...x, calendar: calendar} });
@@ -584,7 +587,16 @@ class HomeFeedCard extends LitElement {
           						resolve([]);
           					} else {
           						console.warn(`Unexpected response format for calendar ${calendar}:`, response);
-          						resolve([]);
+          						// Try alternative response formats
+          						if (response && response.events) {
+          							const events = response.events.map(x => { return {...x, calendar: calendar} });
+          							resolve(events);
+          						} else if (Array.isArray(response)) {
+          							const events = response.map(x => { return {...x, calendar: calendar} });
+          							resolve(events);
+          						} else {
+          							resolve([]);
+          						}
           					}
           				} catch (wsError) {
           					console.error(`Error subscribing to calendar ${calendar}:`, wsError?.message || wsError);
