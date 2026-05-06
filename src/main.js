@@ -512,27 +512,43 @@ class HomeFeedCard extends LitElement {
 	this.buildIfReady();
   }
   
+  
   eventTime(eventTime)
    {
-		return ((eventTime.date) ? eventTime.date : (eventTime.dateTime) ? eventTime.dateTime : eventTime);   	
+		// Handle both old format (with .date or .dateTime properties) and new WebSocket format (direct string)
+		if(typeof eventTime === 'object') {
+			return ((eventTime.date) ? eventTime.date : (eventTime.dateTime) ? eventTime.dateTime : eventTime);
+		}
+		return eventTime;
    }
    
    eventAllDay(event){
    		var allDay = false;
-   		if(event.start.date){
-				allDay = true;
-		}
-		else if(event.start.dateTime){
-			allDay = false;	
-		}
-		else{
-			let start = this.moment(event.start);
-			let end = this.moment(event.end);
-			let diffInHours = end.diff(start, 'hours');
-			allDay = (diffInHours >= 24);
-		}
-		
-		return allDay;
+   		// Handle both old format and new WebSocket format
+   		let startObj = event.start;
+   		if(typeof startObj === 'object') {
+   			// Old format
+   			if(startObj.date){
+   				allDay = true;
+   			}
+   			else if(startObj.dateTime){
+   				allDay = false;	
+   			}
+   			else{
+   				let start = this.moment(startObj);
+   				let end = this.moment(event.end);
+   				let diffInHours = end.diff(start, 'hours');
+   				allDay = (diffInHours >= 24);
+   			}
+   		} else {
+   			// New WebSocket format - determine if it's all day based on the timestamp format
+   			// All day events will have dates like "2026-05-06" without time
+   			let startStr = String(startObj);
+   			let endStr = String(event.end);
+   			// Check if it looks like a date-only format (YYYY-MM-DD)
+   			allDay = /^\d{4}-\d{2}-\d{2}$/.test(startStr) && /^\d{4}-\d{2}-\d{2}$/.test(endStr);
+   		}
+   		return allDay;
    }
    
   async getEvents() {
@@ -548,9 +564,19 @@ class HomeFeedCard extends LitElement {
 			var calendars = await Promise.all(
         	this.calendars.map(
           		async calendar => {
-          			let url = `calendars/${calendar}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
-          			let result = await this._hass.callApi('get', url);
-          			return result.map(x => { return {...x, calendar: calendar} });
+          			try {
+          				// Use WebSocket API for calendar events
+          				let result = await this._hass.callWS({
+          					type: 'calendar/event/subscribe',
+          					entity_id: calendar,
+          					start: start,
+          					end: end
+          				});
+          				return result.events ? result.events.map(x => { return {...x, calendar: calendar} }) : [];
+          			} catch (wsError) {
+          				console.error(`Error subscribing to calendar ${calendar}:`, wsError);
+          				return [];
+          			}
           		  }));
         }
         catch(e){
