@@ -574,13 +574,13 @@ class HomeFeedCard extends LitElement {
           				});
           				return result.events ? result.events.map(x => { return {...x, calendar: calendar} }) : [];
           			} catch (wsError) {
-          				console.error(`Error subscribing to calendar ${calendar}:`, wsError);
+          				console.error(`Error subscribing to calendar ${calendar}:`, wsError?.message || wsError);
           				return [];
           			}
           		  }));
         }
         catch(e){
-        	console.error("Error getting calendar events", e);
+        	console.error("Error getting calendar events:", e?.message || e);
         	var calendars = [];
         }
         
