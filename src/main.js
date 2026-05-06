@@ -571,30 +571,35 @@ class HomeFeedCard extends LitElement {
           					// subscribeMessage returns an unsubscribe function
           					let receivedData = false;
           					
-          					const unsubscribe = this._hass.connection.subscribeMessage(
-          						(message) => {
-          							console.log(`Calendar message for ${calendar}:`, message);
-          							
-          							if (!receivedData) {
-          								receivedData = true;
-          								// Immediately unsubscribe after first message
-          								if (unsubscribe) {
-          									unsubscribe();
-          								}
-          								
-          								// Parse the message to extract events
-          								if (message && message.event && message.event.events) {
-          									const events = message.event.events.map(x => { return {...x, calendar: calendar} });
-          									resolve(events);
-          								} else if (Array.isArray(message)) {
-          									const events = message.map(x => { return {...x, calendar: calendar} });
-          									resolve(events);
-          								} else {
-          									console.warn(`Unexpected message format for ${calendar}:`, message);
-          									resolve([]);
-          								}
-          							}
-          						},
+							let unsubscribe = null;
+							unsubscribe = this._hass.connection.subscribeMessage(
+								(message) => {
+									console.log(`Calendar message for ${calendar}:`, message);
+
+									if (!receivedData) {
+										receivedData = true;
+										// Schedule unsubscribe on next tick to ensure unsubscribe variable is assigned
+										setTimeout(() => {
+											try {
+												if (typeof unsubscribe === 'function') unsubscribe();
+											} catch (e) {
+												console.warn('Error calling unsubscribe:', e);
+											}
+										}, 0);
+
+										// Parse the message to extract events
+										if (message && message.event && message.event.events) {
+											const events = message.event.events.map(x => { return {...x, calendar: calendar} });
+											resolve(events);
+										} else if (Array.isArray(message)) {
+											const events = message.map(x => { return {...x, calendar: calendar} });
+											resolve(events);
+										} else {
+											console.warn(`Unexpected message format for ${calendar}:`, message);
+											resolve([]);
+										}
+									}
+								},
           						{
           							type: 'calendar/event/subscribe',
           							entity_id: calendar,
