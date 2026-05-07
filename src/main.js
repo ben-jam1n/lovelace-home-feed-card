@@ -574,8 +574,6 @@ class HomeFeedCard extends LitElement {
 							let unsubscribe = null;
 							unsubscribe = this._hass.connection.subscribeMessage(
 								(message) => {
-									console.log(`Calendar message for ${calendar}:`, message);
-
 									if (!receivedData) {
 										receivedData = true;
 										// Schedule unsubscribe on next tick to ensure unsubscribe variable is assigned
