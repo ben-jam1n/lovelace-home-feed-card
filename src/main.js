@@ -588,7 +588,11 @@ class HomeFeedCard extends LitElement {
 										}, 0);
 
 										// Parse the message to extract events
-										if (message && message.event && message.event.events) {
+										// The WebSocket subscription returns {events: [...]}
+										if (message && message.events && Array.isArray(message.events)) {
+											const events = message.events.map(x => { return {...x, calendar: calendar} });
+											resolve(events);
+										} else if (message && message.event && message.event.events && Array.isArray(message.event.events)) {
 											const events = message.event.events.map(x => { return {...x, calendar: calendar} });
 											resolve(events);
 										} else if (Array.isArray(message)) {
