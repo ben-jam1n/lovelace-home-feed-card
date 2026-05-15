@@ -28,6 +28,8 @@ class HomeFeedCard extends LitElement {
 		this.browser_language = window.navigator.userLanguage || window.navigator.language;
 		if(this.browser_language == "hy") this.browser_language = "hy-am"; // "hy" (Armenian) wrongly maps to zh-tw (Taiwan Chinese)
 		this.moment.locale(this.browser_language);
+		this._buildDebounceTimer = null;
+		this._lastRelevantStateKeys = new Set();
 		this.preloadElementsIfNeeded();
   	}
   	
@@ -50,6 +52,11 @@ class HomeFeedCard extends LitElement {
   		if (this._unsubNotifications) {
   			this._unsubNotifications();
   			this._unsubNotifications = undefined;
+    	}
+    	
+    	if (this._buildDebounceTimer) {
+    		clearTimeout(this._buildDebounceTimer);
+    		this._buildDebounceTimer = null;
     	}
     	
   		super.disconnectedCallback();
@@ -1272,7 +1279,14 @@ class HomeFeedCard extends LitElement {
       		}
     	);
     	
-		this.buildIfReady();
+    	// Debounce the buildIfReady call to prevent excessive rebuilds
+    	if (this._buildDebounceTimer) {
+    		clearTimeout(this._buildDebounceTimer);
+    	}
+    	this._buildDebounceTimer = setTimeout(() => {
+    		this.buildIfReady();
+    		this._buildDebounceTimer = null;
+    	}, 250);
   	}
   	
   	getCardSize() {

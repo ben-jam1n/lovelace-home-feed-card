@@ -1,4 +1,4 @@
-export function subscribeNotifications (conn, onChange)
+export function subscribeNotifications (conn, onChange, eventType)
 {
   const params = {
     type: "persistent_notification/subscribe",
